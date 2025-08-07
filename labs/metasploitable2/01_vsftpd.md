@@ -13,8 +13,10 @@ nmap -sS -sV -p- 192.168.56.102
 
 ### Resultado:
 
-PORT      STATE SERVICE     VERSION
-21/tcp    open  ftp         vsftpd 2.3.4
+| Puerto  | Estado | Servicio | Versión     |
+|---------|--------|----------|-------------|
+| 21/tcp  | open   | ftp      | vsftpd 2.3.4 |
+
 
 ✅ Observamos que el servicio FTP usa la versión vsftpd 2.3.4, la cual es conocida por tener una backdoor deliberada.
 
@@ -24,7 +26,7 @@ La versión vsftpd 2.3.4 contiene una puerta trasera activada cuando se incluye 
 
 Referencias:
 
-- [CVE]:(https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2011-2523).
+- [CVE-2011-2523](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2011-2523).
 - Vector: FTP login → trigger backdoor shell.
 
 ## 💥 3. Explotación automática con Metasploit.
