@@ -7,6 +7,6 @@ Esta carpeta contiene varios scripts desarrollados por Javier para tareas de pen
 | Script                        | Descripción                                      |
 |------------------------------|--------------------------------------------------|
 | `vsftpd_2.3.4_exploit.sh`    | Exploit para la backdoor de vsftpd 2.3.4         |
-
+| `mysql_backdoor_shell.sh`    | Exploit que activa el backdoor y abre shell      |
 
 > Todos los scripts incluyen comentarios explicativos en el código fuente.
