@@ -59,7 +59,7 @@ Creamos un scrip en Bash llamado `capturar_ids.sh` que:
 
 ⚠️ Recuerda ajustar el valor de tu cookie si estás autenticado, aunque en este script no se usa una cookie previa.
 
-#### 📄 Script: capturar_ids.sh
+### 📄 Script: capturar_ids.sh
 
 ```bash
 #!/bin/bash
@@ -84,7 +84,7 @@ echo "[*] Tokens capturados: $(wc -l < tokens.txt)"
 echo "[*] Únicos: $(sort tokens.txt | uniq | wc -l)"
 ```
 
-#### 🧾 Explicación línea por línea del script
+### 🧾 Explicación línea por línea del script
 
 ```bash
 #!/bin/bash
@@ -147,7 +147,7 @@ echo "[*] Únicos: $(sort tokens.txt | uniq | wc -l)"
 
 - Muestra el total de tokens y cuántos son únicos.
 
-#### 🧪 Ejecución del script
+### 🧪 Ejecución del script
 
 ```bash
 chmod +x capturar_ids.sh
@@ -156,16 +156,17 @@ chmod +x capturar_ids.sh
 
 Esto ejecutará el script, guardará los tokens en `tokens.txt` y mostrará estadísticas básicas.
 
-#### 📊 Análisis de resultados
+### 📊 Análisis de resultados
+
 
 <img width="356" height="79" alt="imagen" src="https://github.com/user-attachments/assets/eb36398e-6be6-4efa-89f0-7c861a78a665" />
+
 
 | Métrica |	Valor	| Interpretación |
 | muestras |	2000 tokens capturados |	Buen tamaño para análisis estadístico |
 | únicos |	1000 tokens únicos | 50% de colisiones. Muy inseguro |
 
 Este resultado indica que DVWA en nivel Low genera IDs de sesión repetitivos y predecibles, lo que representa una vulnerabilidad grave.
-
 
 ### 3.3 Analizamos entropía, longitud y colisiones
 
@@ -179,7 +180,7 @@ Una vez capturados los tokens, analizamos su calidad como identificadores de ses
 
 ---
 
-#### 🐍 Script: `analyze_weakids.py`
+### 🐍 Script: `analyze_weakids.py`
 
 ```python
 #!/usr/bin/env python3
@@ -212,9 +213,9 @@ print(f"entropia_media_por_caracter={H_per_char:.3f} bits/car")
 print(f"charset={''.join(charset)}")
 ```
 
-#### 🧾 Explicación línea por línea del script de python analyze_weakids.py
+### 🧾 Explicación línea por línea del script de python analyze_weakids.py
 
-##### 🔧 Cabecera del script
+#### 🔧 Cabecera del script
 
 ```Python
 #!/usr/bin/env python3
@@ -223,7 +224,7 @@ print(f"charset={''.join(charset)}")
 - Indica que el script desde ejecutarse con Python 3.
 - Permite que el archivo se ejecute directamente como un programa.
 
-##### 📦 Importación de módulos
+#### 📦 Importación de módulos
 
 ```Python
 import math, sys, re
@@ -235,7 +236,7 @@ from collections import Counter
 - re: para expresiones regulares.
 - Counter: para contar ocurrencias de caracteres en cada token.
 
-##### 📥 Lectura de datos
+#### 📥 Lectura de datos
 
 ```Python
 data = [line.strip() for line in sys.stdin if line.strip()]
@@ -245,7 +246,7 @@ data = [line.strip() for line in sys.stdin if line.strip()]
 - line.strip(): elimina espacios o saltos de línea.
 - Filtra líneas vacías.
 
-##### 📊 Métricas básicas
+#### 📊 Métricas básicas
 
 ```Python
 n = len(data)
@@ -259,7 +260,7 @@ avg_len = sum(lengths)/n if n else 0
 - Calcula la longitud de cada token.
 - avg_len: longitud media de los tokens.
 
-##### 🔐 Entropía de Shannon
+#### 🔐 Entropía de Shannon
 
 ```Python
 def shannon(s):
@@ -275,7 +276,7 @@ def shannon(s):
 
                 H=−∑pilog⁡2piH = -\sum p_i \log_2 p_i
 
-##### 📊 Entropía total y por carácter
+#### 📊 Entropía total y por carácter
 
 ```Python
 H_tokens = sum(shannon(x) for x in data)/n if n else 0
@@ -285,7 +286,7 @@ H_per_char = sum(shannon(x)/len(x) for x in data)/n if n else 0
 - H_tokens: entropía media por token completo.
 - H_per_char: entropía media por carácter.
 
-##### 🔤 Conjunto de caracteres usados
+#### 🔤 Conjunto de caracteres usados
 
 ```Python
 charset = sorted(set("".join(data)))
@@ -295,7 +296,7 @@ charset = sorted(set("".join(data)))
 - Extrae los caracteres únicos.
 - Los ordena alfabéticamente.
 
-##### 📋 Resultados en pantalla
+#### 📋 Resultados en pantalla
 
 ```Python
 print(f"muestras={n}")
@@ -313,7 +314,7 @@ print(f"charset={''.join(charset)}")
 - entropía: mide cuán impredecibles son los tokens.
 - charset: muestra qué caracteres se usan (por ejemplo, sólo números, hexadecimales, etc).
 
-##### ▶️ Ejecución del script
+#### ▶️ Ejecución del script
 
 ```bash
 python analyze_weakids.py < tokens.txt
@@ -321,7 +322,7 @@ python analyze_weakids.py < tokens.txt
 
 Este comando redirige el contenido de tokens.txt como entrada estándar al script.
 
-### 📊 Análisis de los resultados
+## 📊 Análisis de los resultados
 
 <img width="359" height="129" alt="imagen" src="https://github.com/user-attachments/assets/f43e3619-0f71-40c6-b736-c3bdb1ab5c02" />
 
@@ -336,7 +337,7 @@ Este comando redirige el contenido de tokens.txt como entrada estándar al scrip
 | charset=0123456789abcdefghijklmnopqrstuv | Solo 32 caracteres usados     | No hay mayúsculas, símbolos, ni alta variabilidad |
 
 
-### 🔐 ¿Qué significa esto?
+## 🔐 ¿Qué significa esto?
 
 Tras ejecutar el análisis con `analyze_weakids.py`, se confirma que:
 
@@ -344,7 +345,7 @@ Tras ejecutar el análisis con `analyze_weakids.py`, se confirma que:
 - **Entropía baja = predictibilidad alta:** un atacante podría generar tokens válidos por fuerza bruta.
 - **Colisiones del 50%:** significa que el servidor está reutilizando IDs o generándolos con un algoritmo pobre.
 
-### 📌 Interpretación (Low)
+## 📌 Interpretación (Low)
 
 - Si observamos **muchas colisiones** o **patrones evidentes** (por ejemplo, números que incrementan, hexadecimales que cambian solo el final), el sistema es vulnerable.
 - Una **entropía por carácter baja** (muy por debajo de ~5–6 bits/car para un charset alfanumérico amplio) es una señal clara de debilidad.
