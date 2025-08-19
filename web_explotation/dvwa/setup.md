@@ -25,6 +25,7 @@ chmod +x ~/Pentesting/DVWA/log.sh
 ```bash
 docker pull vulnerables/web-dvwa
 docker run -d --name dvwa -p 8080:80 vulnerables/web-dvwa
+docker start dvwa
 ```
 
 ## 4️⃣ Acceder desde navegador
