@@ -102,9 +102,7 @@ Protocol on 192.168.56.102:21/tcp matches ftp - banner: 220 (vsFTPd 2.3.4)
 - **Puerto 53:** Servicio DNS detectado.
 - El banner es mínimo, pero suficiente para identificar el protocolo.
 
-## 📋 Tabla resumen
-
-### 🧠 Servicios detectados por Amap en Metasploitable2
+## 📋 Tabla resumen - 🧠 Servicios detectados por Amap en Metasploitable2
 
 | Puerto | Protocolo | Servicio detectado | Banner / Versión                         |
 |--------|-----------|--------------------|------------------------------------------|
@@ -136,4 +134,3 @@ Protocol on 192.168.56.102:21/tcp matches ftp - banner: 220 (vsFTPd 2.3.4)
 
 - [Documentación oficial de Amap en Kali Linux](https://www.kali.org/tools/amap/)
 - [Tutorial práctico de Amap en Sweshi](https://sweshi.com/CyberSecurityTutorials/Penetration%20Testing%20and%20Ethical%20Hacking/amap%20tutorial.php)
-- 
